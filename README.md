@@ -1,6 +1,6 @@
-# Helix Service
+# Helix Algolia
 
-> An example service to be used in and with Project Helix
+> An experimental service that sends the contents of a GitHub repository to Algolia
 
 ## Status
 [![codecov](https://img.shields.io/codecov/c/github/adobe/helix-service.svg)](https://codecov.io/gh/adobe/helix-service)
