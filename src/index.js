@@ -22,7 +22,7 @@ const algoliasearch = require('algoliasearch');
  * @param {string} name name of the person to greet
  * @returns {object} a greeting
  */
-async function main({ name = "world", repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_KEY } = {}) {
+async function main({ repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_KEY, depth = 100 } = {}) {
   // Make temporary directory
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "test-"));
   console.log("cloning into", dir);
@@ -30,12 +30,16 @@ async function main({ name = "world", repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_K
   await git.clone({
     fs,
     dir,
-    url: `https://github.com/${owner}/${repo}.git`
+    url: `https://github.com/${owner}/${repo}.git`,
+    depth
   });
 
+  console.log('clone completed');
   // Now it should not be empty...
 
   const commits = await git.log({ fs, dir });
+
+  console.log('log retrieved');
 
   const docs = {};
 
@@ -62,8 +66,10 @@ async function main({ name = "world", repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_K
         if (!docs[A.fullpath + '-' + A.oid]) {
           docs[A.fullpath + '-' + A.oid] = {
             refs: [],
-            path: A.fullpath,
+            path: '/' + A.fullpath,
             name: A.basename,
+            dir: '/' + A.fullpath.substring(0, A.fullpath.length - A.basename.length - 1),
+            type: A.basename.split('.').pop(),
             objectID: A.fullpath + '-' + A.oid
           };
 
@@ -78,14 +84,17 @@ async function main({ name = "world", repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_K
     return job;
   });
 
-  await Promise.all(jobs);
-  console.log(docs);
 
+  console.log('todo:', jobs.length);
+  await Promise.all(jobs);
+  //console.log(docs);
+
+  console.log('uploading index');
   const client = algoliasearch(ALGOLIA_APP_ID, ALGOLIA_API_KEY);
   const index = client.initIndex(`${owner}--${repo}`);
 
   index.setSettings({
-    'attributesForFaceting': ['refs', 'filterOnly(path)']
+    'attributesForFaceting': ['refs', 'filterOnly(path)', 'type']
   })
 
   return index.saveObjects(Object.values(docs));
