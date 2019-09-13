@@ -12,13 +12,19 @@
 
 /* eslint-env mocha */
 
-'use strict';
+"use strict";
 
-const assert = require('assert');
-const index = require('../src/index.js').main;
+const assert = require("assert");
+const index = require("../src/index.js").main;
 
-describe('Index Tests', () => {
-  it('index checks clones a repository', async () => {
-    const result = await index({owner: 'trieloff', repo: 'helix-algolia'});
+describe("Index Tests", () => {
+  it("index checks clones a repository", async () => {
+    const result = await index({
+      owner: "trieloff",
+      repo: "helix-algolia",
+      ALGOLIA_APP_ID: process.env.ALGOLIA_APP_ID,
+      ALGOLIA_API_KEY: process.env.ALGOLIA_API_KEY
+    });
+    console.log(result);
   }).timeout(100000);
 });

@@ -15,12 +15,14 @@ const git = require("isomorphic-git");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const algoliasearch = require('algoliasearch');
+
 /**
  * This is the main function
  * @param {string} name name of the person to greet
  * @returns {object} a greeting
  */
-async function main({ name = "world", repo, owner } = {}) {
+async function main({ name = "world", repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_KEY } = {}) {
   // Make temporary directory
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "test-"));
   console.log("cloning into", dir);
@@ -60,9 +62,15 @@ async function main({ name = "world", repo, owner } = {}) {
         if (!docs[A.fullpath + '-' + A.oid]) {
           docs[A.fullpath + '-' + A.oid] = {
             refs: [],
-            path: A.fullpath
+            path: A.fullpath,
+            objectID: A.fullpath + '-' + A.oid
           };
+
+          A.populateContent().then(() => {
+            docs[A.fullpath + '-' + A.oid].content = A.content.toString().slice(0, 1024);
+          });
         }
+
         docs[A.fullpath + '-' + A.oid].refs.push(commit.oid);
       }
     });
@@ -72,9 +80,10 @@ async function main({ name = "world", repo, owner } = {}) {
   await Promise.all(jobs);
   console.log(docs);
 
-  return {
-    body: `Hello, ${name}.`
-  };
+  const client = algoliasearch(ALGOLIA_APP_ID, ALGOLIA_API_KEY);
+  const index = client.initIndex(`${owner}--${repo}`);
+
+  return index.saveObjects(Object.values(docs));
 }
 
 module.exports = { main: wrap(main) };
