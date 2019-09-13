@@ -18,13 +18,7 @@ const assert = require('assert');
 const index = require('../src/index.js').main;
 
 describe('Index Tests', () => {
-  it('index function is present', async () => {
-    const result = await index({});
-    assert.deepEqual(result, { body: 'Hello, world.' });
-  });
-
-  it('index function returns an object', async () => {
-    const result = await index();
-    assert.equal(typeof result, 'object');
-  });
+  it('index checks clones a repository', async () => {
+    const result = await index({owner: 'trieloff', repo: 'helix-algolia'});
+  }).timeout(100000);
 });
