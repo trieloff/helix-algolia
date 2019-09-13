@@ -63,6 +63,7 @@ async function main({ name = "world", repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_K
           docs[A.fullpath + '-' + A.oid] = {
             refs: [],
             path: A.fullpath,
+            name: A.basename,
             objectID: A.fullpath + '-' + A.oid
           };
 
@@ -82,6 +83,10 @@ async function main({ name = "world", repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_K
 
   const client = algoliasearch(ALGOLIA_APP_ID, ALGOLIA_API_KEY);
   const index = client.initIndex(`${owner}--${repo}`);
+
+  index.setSettings({
+    'attributesForFaceting': ['refs', 'filterOnly(path)']
+  })
 
   return index.saveObjects(Object.values(docs));
 }
