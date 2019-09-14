@@ -22,20 +22,26 @@ const algoliasearch = require('algoliasearch');
  * @param {string} name name of the person to greet
  * @returns {object} a greeting
  */
-async function main({ repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_KEY, depth = 100 } = {}) {
-  // Make temporary directory
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "test-"));
-  console.log("cloning into", dir);
+async function main({ repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_KEY, depth = 100, shard = 0, shards = 1, existing } = {}) {
+  let dir;
+  if (existing) {
+    dir = existing;
+    console.log('using existing checkout', existing);
+  } else {
+    // Make temporary directory
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "test-"));
+    console.log("cloning into", dir);
 
-  await git.clone({
-    fs,
-    dir,
-    url: `https://github.com/${owner}/${repo}.git`,
-    depth
-  });
+    await git.clone({
+      fs,
+      dir,
+      url: `https://github.com/${owner}/${repo}.git`,
+      depth
+    });
 
-  console.log('clone completed');
-  // Now it should not be empty...
+    console.log('clone completed');
+    // Now it should not be empty...
+  }
 
   const commits = await git.log({ fs, dir });
 
@@ -56,10 +62,16 @@ async function main({ repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_KEY, depth = 100 
           return;
         }
 
+        if (!A.fullpath.match(/\.md$/)) {
+          return;
+        }
+
         // generate ids
         await A.populateHash();
 
-        if (!A.fullpath.match(/\.md$/)) {
+        if (parseInt(A.oid.substr(0, 5), 16) % parseInt(shards, 10) !== parseInt(shard, 10)) {
+          // enable parallel processing
+          //console.log('dicarding shard', parseInt(A.oid.substr(0, 5), 16));
           return;
         }
 
@@ -73,12 +85,14 @@ async function main({ repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_KEY, depth = 100 
             objectID: A.fullpath + '-' + A.oid
           };
 
+          /*
           A.populateContent().then(() => {
             docs[A.fullpath + '-' + A.oid].content = A.content.toString().slice(0, 1024);
           });
+          */
         }
 
-        docs[A.fullpath + '-' + A.oid].refs.push(commit.oid);
+        //docs[A.fullpath + '-' + A.oid].refs.push(commit.oid);
       }
     });
     return job;
