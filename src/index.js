@@ -15,18 +15,28 @@ const git = require("isomorphic-git");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const algoliasearch = require('algoliasearch');
+const algoliasearch = require("algoliasearch");
+const $ = require("shelljs");
 
 /**
  * This is the main function
  * @param {string} name name of the person to greet
  * @returns {object} a greeting
  */
-async function main({ repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_KEY, depth = 100, shard = 0, shards = 1, existing } = {}) {
+async function main({
+  repo,
+  owner,
+  ALGOLIA_APP_ID,
+  ALGOLIA_API_KEY,
+  depth = 100,
+  shard = 0,
+  shards = 1,
+  existing
+} = {}) {
   let dir;
   if (existing) {
     dir = existing;
-    console.log('using existing checkout', existing);
+    console.log("using existing checkout", existing);
   } else {
     // Make temporary directory
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "test-"));
@@ -39,77 +49,104 @@ async function main({ repo, owner, ALGOLIA_APP_ID, ALGOLIA_API_KEY, depth = 100,
       depth
     });
 
-    console.log('clone completed');
+    console.log("clone completed");
     // Now it should not be empty...
   }
 
-  const commits = await git.log({ fs, dir });
-
-  console.log('log retrieved');
-
-  const docs = {};
-
-  const jobs = commits.map(async commit => {
-    const job = git.walkBeta1({
-      trees: [git.TREE({ dir, fs, ref: commit.oid })],
-      map: async function([A]) {
-        // ignore directories
-        if (A.fullpath === ".") {
-          return;
-        }
-        await A.populateStat();
-        if (A.type === "tree") {
-          return;
-        }
-
-        if (!A.fullpath.match(/\.md$/)) {
-          return;
-        }
-
-        // generate ids
-        await A.populateHash();
-
-        if (parseInt(A.oid.substr(0, 5), 16) % parseInt(shards, 10) !== parseInt(shard, 10)) {
-          // enable parallel processing
-          //console.log('dicarding shard', parseInt(A.oid.substr(0, 5), 16));
-          return;
-        }
-
-        if (!docs[A.fullpath + '-' + A.oid]) {
-          docs[A.fullpath + '-' + A.oid] = {
-            refs: [],
-            path: '/' + A.fullpath,
-            name: A.basename,
-            dir: '/' + A.fullpath.substring(0, A.fullpath.length - A.basename.length - 1),
-            type: A.basename.split('.').pop(),
-            objectID: A.fullpath + '-' + A.oid
-          };
-
-          /*
-          A.populateContent().then(() => {
-            docs[A.fullpath + '-' + A.oid].content = A.content.toString().slice(0, 1024);
-          });
-          */
-        }
-
-        //docs[A.fullpath + '-' + A.oid].refs.push(commit.oid);
-      }
-    });
-    return job;
+  $.cd(dir);
+  const log = $.exec('git log --pretty="format:%H"', {
+    async: true,
+    silent: true
   });
 
+  const docs = {};
+  const jobs = [];
 
-  console.log('todo:', jobs.length);
+  const adddoc = (p, h, c) => {
+    const key = p + "-" + h;
+    if (!docs[key]) {
+      docs[key] = {
+        refs: [],
+        path: "/" + p,
+        name: path.basename(p),
+        dir: path.dirname(p),
+        type: path.extname(p),
+        objectID: key
+      };
+    }
+    //console.log(c.split('\n'));
+    docs[key].refs.push(c);
+  };
+
+  jobs.push(
+    new Promise(logresolve => {
+      log.stdout.on("end", logresolve);
+      log.stdout.on("data", commits => {
+        commits.split("\n").map(commit => {
+          const processline = line => {
+            if (!line) {
+              return;
+            }
+            const [info, path] = line.split("\t");
+            const [mode, type, hash] = info.split(" ");
+            if (type !== "blob") {
+              return;
+            }
+            if (!path.match(/\.md$/)) {
+              return;
+            }
+            if (
+              parseInt(hash.substr(0, 5), 16) % parseInt(shards, 10) !==
+              parseInt(shard, 10)
+            ) {
+              // enable parallel processing
+              //console.log('dicarding shard', parseInt(A.oid.substr(0, 5), 16));
+              return;
+            }
+            adddoc(path, hash, commit);
+          };
+
+          const ls = $.exec("git ls-tree --full-name -r " + commits, {
+            async: true,
+            silent: true
+          });
+          let buf = "";
+          jobs.push(
+            new Promise(lsresolve => {
+              ls.stdout.on("data", logline => {
+                buf = buf + logline;
+                const lines = buf.split("\n");
+                if (lines.length > 1) {
+                  buf = lines.pop();
+                  lines.map(processline);
+                }
+              });
+
+              ls.stdout.on("end", () => {
+                buf.split("\n").map(processline);
+                lsresolve(true);
+              });
+            })
+          );
+        });
+      });
+    })
+  );
+
+  await Promise.all(jobs);
+  await Promise.all(jobs);
+
+  console.log("todo:", jobs.length);
   await Promise.all(jobs);
   //console.log(docs);
 
-  console.log('uploading index');
+  console.log("uploading index");
   const client = algoliasearch(ALGOLIA_APP_ID, ALGOLIA_API_KEY);
   const index = client.initIndex(`${owner}--${repo}`);
 
   index.setSettings({
-    'attributesForFaceting': ['refs', 'filterOnly(path)', 'type']
-  })
+    attributesForFaceting: ["refs", "filterOnly(path)", "type"]
+  });
 
   return index.saveObjects(Object.values(docs));
 }

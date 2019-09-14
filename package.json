@@ -30,7 +30,8 @@
   "dependencies": {
     "@adobe/helix-status": "4.3.3",
     "algoliasearch": "^3.34.0",
-    "isomorphic-git": "^0.67.2"
+    "isomorphic-git": "^0.67.2",
+    "shelljs": "^0.8.3"
   },
   "devDependencies": {
     "@adobe/eslint-config-helix": "1.1.0",

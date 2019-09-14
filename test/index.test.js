@@ -56,7 +56,7 @@ describe("Index Tests", () => {
     assert.equal((await shard1).objectIDs.length + (await shard2).objectIDs.length, (await all).objectIDs.length);
   }).timeout(100000);
 
-  it.only("index checks clones a large repository", async () => {
+  it.only("index checks imports a medium repository", async () => {
     const shard1 = index({
       owner: "gatsbyjs",
       repo: "gatsby",
@@ -64,10 +64,29 @@ describe("Index Tests", () => {
       ALGOLIA_API_KEY: process.env.ALGOLIA_API_KEY,
       depth: 1,
       shard: 0,
-      shards: 100,
+      shards: 1,
       existing: '/tmp/gatsby'
     });
 
     console.log((await shard1).objectIDs);
+  }).timeout(10000000);
+
+  it.only("index checks imports a large repository", async () => {
+    const jobs = [];
+
+    const shards = 10;
+    for (var i = 0; i < 10; i++) {
+      jobs.push(index({
+        owner: "MicrosoftDocs",
+        repo: "azure-docs",
+        ALGOLIA_APP_ID: process.env.ALGOLIA_APP_ID,
+        ALGOLIA_API_KEY: process.env.ALGOLIA_API_KEY,
+        depth: 1,
+        shard: i,
+        shards, // only upload a tenth
+        existing: '/tmp/azure-docs'
+      }));
+    }
+    console.log((await Promise.all(jobs)));
   }).timeout(10000000);
 });
