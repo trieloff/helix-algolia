@@ -18,6 +18,14 @@ const os = require("os");
 const algoliasearch = require("algoliasearch");
 const $ = require("shelljs");
 
+function makeparents(filename = '') {
+  const parent = path.dirname(filename[0] === '/' ? filename : '/' + filename);
+  if (parent === '/' || parent === '.' || !parent) {
+    return ['/'];
+  }
+  return [...makeparents(parent), parent];
+}
+
 /**
  * This is the main function
  * @param {string} name name of the person to greet
@@ -68,6 +76,7 @@ async function main({
       docs[key] = {
         refs: [],
         path: "/" + p,
+        parents: makeparents(p),
         name: path.basename(p),
         dir: path.dirname(p),
         type: path.extname(p),
@@ -145,10 +154,10 @@ async function main({
   const index = client.initIndex(`${owner}--${repo}`);
 
   index.setSettings({
-    attributesForFaceting: ["refs", "filterOnly(path)", "type"]
+    attributesForFaceting: ["refs", "filterOnly(path)", "type", "parents"]
   });
 
   return index.saveObjects(Object.values(docs));
 }
 
-module.exports = { main: wrap(main) };
+module.exports = { main: wrap(main), makeparents };

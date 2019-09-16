@@ -16,6 +16,7 @@
 
 const assert = require("assert");
 const index = require("../src/index.js").main;
+const makeparents = require('../src/index.js').makeparents;
 
 describe("Index Tests", () => {
   it("index checks clones a repository", async () => {
@@ -56,7 +57,7 @@ describe("Index Tests", () => {
     assert.equal((await shard1).objectIDs.length + (await shard2).objectIDs.length, (await all).objectIDs.length);
   }).timeout(100000);
 
-  it.only("index checks imports a medium repository", async () => {
+  it("index checks imports a medium repository", async () => {
     const shard1 = index({
       owner: "gatsbyjs",
       repo: "gatsby",
@@ -71,12 +72,12 @@ describe("Index Tests", () => {
     console.log((await shard1).objectIDs);
   }).timeout(10000000);
 
-  it.only("index checks imports a large repository", async () => {
+  it("index checks imports a large repository", async () => {
     const jobs = [];
 
-    const shards = 10;
-    for (var i = 0; i < 10; i++) {
-      jobs.push(index({
+    const shards = 20;
+    for (var i = 0; i < shards; i++) {
+      await index({
         owner: "MicrosoftDocs",
         repo: "azure-docs",
         ALGOLIA_APP_ID: process.env.ALGOLIA_APP_ID,
@@ -85,8 +86,44 @@ describe("Index Tests", () => {
         shard: i,
         shards, // only upload a tenth
         existing: '/tmp/azure-docs'
-      }));
+      });
     }
-    console.log((await Promise.all(jobs)));
   }).timeout(10000000);
+});
+
+describe('Makeparents Test', () => {
+  it('works for normal paths', () => {
+    assert.deepEqual(makeparents('/foo/bar/baz/hello.md'), [
+      '/',
+      '/foo',
+      '/foo/bar',
+      '/foo/bar/baz']);
+  });
+
+  it('works for short paths', () => {
+    assert.deepEqual(makeparents('/hello.md'), [
+      '/']);
+  });
+
+  it('works for too short paths', () => {
+    assert.deepEqual(makeparents('hello.md'), [
+      '/']);
+  });
+
+  it('works for improper paths', () => {
+    assert.deepEqual(makeparents('foo/bar/baz/hello.md'), [
+      '/',
+      '/foo',
+      '/foo/bar',
+      '/foo/bar/baz']);
+  });
+
+  it('works for empty paths', () => {
+    assert.deepEqual(makeparents(''), [
+      '/',]);
+
+      assert.deepEqual(makeparents(), [
+        '/',]);
+  });
+
 });
