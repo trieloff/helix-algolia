@@ -57,7 +57,7 @@ describe("Index Tests", () => {
     assert.equal((await shard1).objectIDs.length + (await shard2).objectIDs.length, (await all).objectIDs.length);
   }).timeout(100000);
 
-  it("index checks imports a medium repository", async () => {
+  it.only("index checks imports a medium repository", async () => {
     const shard1 = index({
       owner: "gatsbyjs",
       repo: "gatsby",
@@ -75,7 +75,7 @@ describe("Index Tests", () => {
   it("index checks imports a large repository", async () => {
     const jobs = [];
 
-    const shards = 20;
+    const shards = 40;
     for (var i = 0; i < shards; i++) {
       await index({
         owner: "MicrosoftDocs",
